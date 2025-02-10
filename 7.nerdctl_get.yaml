@@ -1,0 +1,27 @@
+- name: 获取nerdctl工具
+  hosts: master
+  become: yes
+  tasks:
+#    - name: 下载 nerdctl 压缩包
+#      get_url:
+#        url: https://github.com/containerd/nerdctl/releases/download/v2.0.3/nerdctl-2.0.3-linux-amd64.tar.gz
+#        dest: /tmp/nerdctl-2.0.3-linux-amd64.tar.gz
+#        mode: '0644'
+    - name: 分发nerdctl 压缩包
+      copy:
+        src: /tmp/nerdctl-2.0.3-linux-amd64.tar.gz
+        dest: /tmp/nerdctl-2.0.3-linux-amd64.tar.gz
+        mode: '0644'
+
+    - name: 解压 nerdctl 压缩包
+      unarchive:
+        src: /tmp/nerdctl-2.0.3-linux-amd64.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: 移动 nerdctl 到系统路径
+      copy:
+        src: /tmp/nerdctl
+        dest: /usr/bin/nerdctl
+        mode: '0755'
+        remote_src: yes

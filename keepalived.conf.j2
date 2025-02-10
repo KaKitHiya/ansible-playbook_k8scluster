@@ -1,0 +1,27 @@
+global_defs {
+   notification_email {
+     {{ 个人信息，随意填 }}
+   }
+   notification_email_from Alexandre.Cassen@firewall.loc
+   smtp_server 192.168.200.1
+   smtp_connect_timeout 30
+   router_id LVS_DEVEL
+   vrrp_skip_check_adv_addr
+   vrrp_garp_interval 0
+   vrrp_gna_interval 0
+}
+
+vrrp_instance k8s_vip {
+    state {{ kp_state MASTER | BACKUP }}
+    interface eth0
+    virtual_router_id 51
+    priority {{ kp_priority 优先级选项 }}
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 12345
+    }
+    virtual_ipaddress {
+        {{ 虚拟vip }}
+    }
+}

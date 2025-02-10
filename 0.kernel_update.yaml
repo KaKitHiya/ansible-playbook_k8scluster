@@ -1,0 +1,43 @@
+- name: 升级centos7内核
+  hosts: k8s
+  become: true
+  tasks:
+    - name: 禁用防火墙和SELinux
+      systemd:
+        name: firewalld
+        state: stopped
+        enabled: no
+      when: ansible_os_family == "RedHat"
+
+    - name: 关闭swap
+      shell: |
+        swapoff -a
+        sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab     
+    - name: 下载内核rpm安装包
+      get_url: 
+        url: https://dl.lamp.sh/kernel/el7/kernel-ml-6.7.2-1.el7.elrepo.x86_64.rpm
+        dest: /tmp/kernel-ml-6.7.2-1.el7.elrepo.x86_64.rpm
+
+    - name: 下载内核rpm-devel安装包
+      get_url: 
+        url: https://dl.lamp.sh/kernel/el7/kernel-ml-devel-6.7.2-1.el7.elrepo.x86_64.rpm
+        dest: /tmp/kernel-ml-devel-6.7.2-1.el7.elrepo.x86_64.rpm
+
+    - name: 安装内核
+      command: yum localinstall -y /tmp/kernel-ml-6.7.2-1.el7.elrepo.x86_64.rpm /tmp/kernel-ml-devel-6.7.2-1.el7.elrepo.x86_64.rpm
+      register: rpm_output
+    
+    - name: 获取目前内核可用版本
+      command: awk -F\' '$1=="menuentry " {print  $2}' /etc/grub2.cfg
+      register: kernel_info
+
+    - name: 修改内核启动版本
+      command: grub2-set-default 0
+      register: start
+ 
+    - name: 获取当前生效的内核信息
+      command: grub2-editenv list
+      register: envlist
+
+   - name: 重启服务器
+     shell: reboot

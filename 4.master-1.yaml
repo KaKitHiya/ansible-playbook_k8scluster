@@ -1,0 +1,165 @@
+- name: 初始化第一个Master节点
+  hosts: master1
+  become: true
+  tasks:
+    - name: 生成kubeadm配置
+      shell:
+        kubeadm config print init-defaults --component-configs KubeProxyConfiguration --component-configs KubeletConfiguration > /tmp/cluster.yaml
+
+    - name: 修改集群配置文件
+      replace:
+        path: /tmp/cluster.yaml
+        regexp: "advertiseAddress: 1.2.3.4"
+        replace: "advertiseAddress: {{ ansible_ssh_host }}"
+
+    - name: 配置集群名字
+      replace:
+        path: /tmp/cluster.yaml
+        regexp: "name: node"
+        replace: "name: {{ inventory_hostname }}"
+    
+    - name: 修改集群proxy为ipvs模式
+      replace:
+        path: /tmp/cluster.yaml
+        regexp: 'mode: ""'
+        replace: 'mode: "ipvs"'
+
+    - name: 修改集群镜像为国内阿里云
+      replace:
+        path: /tmp/cluster.yaml
+        regexp: 'registry.k8s.io'
+        replace: 'registry.aliyuncs.com/google_containers'
+
+    - name: 修改ca过期时间
+      replace:
+        path: /tmp/cluster.yaml
+        regexp: '8760h0m0'
+        replace: '87600h0m0'
+   
+    - name: 修改控制平面高可用api地址
+      lineinfile:
+        dest: /tmp/cluster.yaml
+        insertafter: clusterName.*$
+        line: "controlPlaneEndpoint: {{ 私有负载均衡，格式为 'ip:port' }}"
+
+    - name: 修改容器地址和网络插件兼容
+      lineinfile:
+        dest: /tmp/cluster.yaml
+        insertafter: serviceSubnet.*$
+        line: "  podSubnet: {{ 自定义的网络段，用于和后续网络插件匹配（flannel或calico） }}"
+    
+    - name: 初始化集群
+      shell: kubeadm init --config=/tmp/cluster.yaml --upload-certs
+      register: init_output
+
+    - name: 创建 kube文件夹
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+    
+    - name: 复制集群配置文件到用户kubeconfig
+      shell:
+        cp /etc/kubernetes/admin.conf /root/.kube/config
+
+    - name: 指定用户kubeconfig文件
+      shell: export KUBECONFIG=/root/.kube/config
+      args:
+        executable: /bin/bash
+
+    - name: 创建 control plane 加入命令和密钥
+      shell: kubeadm token create --print-join-command --certificate-key $(kubeadm init phase upload-certs --upload-certs | tail -1)
+      args:
+        executable: /bin/bash
+      register: control_plane_join_output
+
+    - name: 获取control plane加入命令和密钥
+      set_fact:
+        control_plane_join_command: "{{ control_plane_join_output.stdout }}"
+   
+    - name: 打印control plane加入命令
+      debug:
+        msg: "{{ control_plane_join_command }}" 
+
+    - name: 创建 worker node 加入命令和密钥
+      shell: kubeadm token create --print-join-command
+      args:
+        executable: /bin/bash
+      register: node_join_output
+
+    - name: 获取worker node加入命令和密钥
+      set_fact:
+        node_join_command: "{{ node_join_output.stdout }}"
+
+    - name: 打印worner node 加入命令
+      debug:
+        msg: "{{ node_join_command }}" 
+
+
+- name: 其余master节点加入集群内
+  hosts: master2:master3
+  become: true
+  tasks:
+    - name: 获取master节点的加入命令
+      copy:
+        content: "{{ hostvars['master1']['control_plane_join_command'] }}"
+        dest: /tmp/control_plane_join.sh
+        mode: 0755
+
+    - name: 执行加入节点操作
+      shell: /tmp/control_plane_join.sh
+
+    - name: 清除加入节点脚本
+      file:
+        path: /tmp/control_plane_join.sh
+        state: absent
+
+
+- name: 加入工作节点
+  hosts: node
+  become: true
+  tasks:
+    - name: 获取worker节点的加入命令
+      copy:
+        content: "{{ hostvars['master1']['node_join_command'] }}"
+        dest: /tmp/worker_node_join.sh
+        mode: 0755
+
+    - name: 执行加入节点操作
+      shell: /tmp/worker_node_join.sh
+
+    - name: 清除加入节点脚本
+      file:
+        path: /tmp/worker_node_join.sh
+        state: absent
+
+- name: 获取admin密钥
+  hosts: master1
+  become: true
+  tasks:
+    - name: 获取远端master1密钥
+      fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: /tmp/admin.conf
+        flat: true
+
+- name: 分发admin密钥
+  hosts: master2,master3
+  become: true
+  tasks:
+    - name: 创建kube文件夹
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+
+    - name: 复制集群配置文件到用户kubeconfig
+      copy:
+        src: /tmp/admin.conf
+        dest: /root/.kube/config
+        mode: "0600"
+
+    - name: 指定用户kubeconfig文件
+      shell: export KUBECONFIG=/root/.kube/config
+      args:
+        executable: /bin/bash

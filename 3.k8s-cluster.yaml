@@ -1,0 +1,26 @@
+- name: 安装Kubernetes组件
+  hosts: k8s
+  vars:
+    k8s_version: "v1.32"
+  tasks:
+    - name: 添加阿里云Kubernetes源
+      yum_repository:
+        name: kubernetes
+        description: Kubernetes
+        baseurl: https://mirrors.aliyun.com/kubernetes-new/core/stable/{{ k8s_version }}/rpm
+        gpgcheck: no
+        enabled: yes
+
+    - name: 安装指定版本组件
+      yum:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+
+    - name: 启动kubelet
+      systemd:
+        name: kubelet
+        enabled: yes
+        state: started
