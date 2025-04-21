@@ -1,0 +1,79 @@
+- name: 修复containerd配置
+  hosts: test
+  tasks:
+#    - name: 同步containerd配置文件
+#      copy:
+#        src: /tmp/config.toml
+#        dest: /etc/containerd/config.toml
+#      ignore_errors: true
+
+#    - name: 创建config目录
+#      file:
+#        path: /etc/containerd/certs.d/{{ item }}
+#        state: directory
+#        mode: '0755'
+#        state: absent
+#      with_items:
+#        - ['registry-1.docker.io','gcr.io','ghcr.io','k8s.gcr.io','quay.io','registry.k8s.io']
+#      ignore_errors: true
+
+#    - name: 删除config目录
+#      file:
+#        path: /etc/containerd/certs.d/{{ item }}
+#        state: directory
+#        mode: '0755'
+#        state: absent
+#      with_items:
+#        - ['docker.elastic.co','docker.io','gcr.io','ghcr.io','registry.k8s.io','mcr.microsoft.com','nvcr.io','quay.io']
+#      ignore_errors: true
+
+    - name: 清空config目录
+      file:
+        path: /etc/containerd/certs.d/{{ item }}
+        state: directory
+        mode: '0755'
+        state: absent
+      with_items:
+        - ['docker.io','gcr.io','ghcr.io','k8s.gcr.io','registry.k8s.io','quay.io']
+
+    - name: 创建config目录
+      file:
+        path: /etc/containerd/certs.d/{{ item }}
+        state: directory
+        mode: '0755'
+      with_items:
+        - ['docker.io','gcr.io','ghcr.io','k8s.gcr.io','registry.k8s.io','quay.io','registry-1.docker.io']
+
+    - name: 创建镜像host配置文件
+      copy:
+        dest: /etc/containerd/certs.d/{{ item.0 }}/hosts.toml
+        content: |
+          server = "https://{{ item.0 }}"
+          [host."https://{{ item.1 }}"]
+            capabilities = ["pull", "resolve"]
+      with_together:
+        - ['docker.io','gcr.io','ghcr.io','k8s.gcr.io','registry.k8s.io','quay.io','registry-1.docker.io']
+        - ['dockerpull.cn','m.daocloud.io/gcr.io','m.daocloud.io/ghcr.io','m.daocloud.io/k8s.gcr.io','m.daocloud.io/registry.k8s.io','m.daocloud.io/quay.io',docker.xuanyuan.me]
+
+    #- name: 创建镜像host配置文件
+    #  copy:
+    #    dest: /etc/containerd/certs.d/{{ item.0 }}/hosts.toml
+    #    content: |
+    #      server = "https://{{ item.0 }}"
+    #      [host."http://{{ item.1 }}"]
+    #        capabilities = ["pull", "resolve"]
+    #  with_together:
+    #    - ['registry-1.docker.io','gcr.io','ghcr.io','k8s.gcr.io','quay.io','registry.k8s.io']
+    #    - ['101.32.95.33:5000','101.32.95.33:5003','101.32.95.33:5001','101.32.95.33:5004','101.32.95.33:5005','101.32.95.33:5002']
+
+#    - name: 分发containerd服务
+#      copy:
+#        src: /tmp/containerd.service
+#        dest: /usr/lib/systemd/system/containerd.service
+
+#    - name: 重启containerd服务
+#      systemd:
+#        name: containerd
+#        state: restarted
+#        enabled: yes
+#        daemon_reload: true

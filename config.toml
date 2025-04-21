@@ -144,8 +144,7 @@ version = 2
       key_model = "node"
 
     [plugins."io.containerd.grpc.v1.cri".registry]
-      config_path = ""
-
+      config_path = "/etc/containerd/certs.d"
       [plugins."io.containerd.grpc.v1.cri".registry.auths]
 
       [plugins."io.containerd.grpc.v1.cri".registry.configs]
@@ -153,20 +152,6 @@ version = 2
       [plugins."io.containerd.grpc.v1.cri".registry.headers]
 
       [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
-        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-          endpoint = ["https://docker.io","https://6qxc6b6n.mirror.aliyuncs.com","https://docker.m.daocloud.io","https://dockerproxy.com/"]
-        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."gcr.io"]
-          endpoint = ["https://gcr.m.daocloud.io","https://gcr.nju.edu.cn","https://gcr.dockerproxy.com"]
-        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
-          endpoint = ["https://k8s-gcr.m.daocloud.io","https://gcr.nju.edu.cn/google-containers/","https://k8s.dockerproxy.com/"]
-        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]
-          endpoint = ["https://quay.m.daocloud.io","https://quay.nju.edu.cn"]
-        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.k8s.io"]
-          endpoint = ["https://k8s.m.daocloud.io","https://k8s.nju.edu.cn"]
-        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.elastic.co"]
-          endpoint = ["https://elastic.m.daocloud.io"]  
-        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."ghcr.io"]
-          endpoint = ["https://ghcr.m.daocloud.io","https://ghcr.nju.edu.cn"] 
 
     [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
       tls_cert_file = ""

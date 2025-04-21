@@ -1,7 +1,32 @@
 - name: k8s lb init
-  hosts: {{ 负载均衡节点 }}
+  hosts: no
   become: true
   tasks:
+    #- name: 禁止swap空间
+    #  shell: |
+    #    swapoff -a
+
+    #- name: 取消fstab开机启动
+    #  lineinfile:
+    #    path: /etc/fstab
+    #    regexp: '^\s*([^#]\S+\s+\S+\s+swap\s+)'
+    #    line: '# \1'
+    #    state: present
+    
+    #- name: 删除原有yum仓库
+    #  shell: rm /etc/yum.repos.d/CentOS7-Base-Wangsu.repo
+    #  ignore_errors: true
+    
+    #- name: 添加阿里云centos7镜像yum源
+    #  copy:
+    #    src: /etc/yum.repos.d/CentOS-Base.repo
+    #    dest: /etc/yum.repos.d/CentOS-Base.repo
+
+    #- name: 清理yum缓存和新建缓存
+    #  shell: |
+    #    yum clean all
+    #    yum makecache
+    
     - name: 安装epel-release
       yum:
         name: 
@@ -51,10 +76,24 @@
         #state: restarted
         enabled: true
 
+    - name: 创建stream LB4配置文件夹
+      file:
+        path: /etc/nginx/stream
+        state: directory
+        mode: 0755
+
+    - name: 修改默认nginx配置
+      copy:
+        src: /tmp/nginx.conf
+        dest: /etc/nginx/default.conf
+        mode: 0644
+        backup: true
+      notify: reload nginx
+
     - name: 加入四层代理配置
-      template:
-        src: /tmp/k8s.conf/j2
-        dest: /etc/nginx/conf.d/k8s.conf
+      copy:
+        src: /tmp/k8s.conf
+        dest: /etc/nginx/stream/k8s.conf
       notify: reload nginx
 
     - name: 加入高可用vip

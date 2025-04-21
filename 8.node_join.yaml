@@ -1,0 +1,35 @@
+- name: 获取节点加入命令
+  hosts: master1
+  become: true
+  tasks:
+    - name: 创建 worker node 加入命令和密钥
+      shell: kubeadm token create --print-join-command
+      args:
+        executable: /bin/bash
+      register: worker_join_output
+
+    - name: 获取worker node加入命令和密钥
+      set_fact:
+        worker_node_join_command: "{{ worker_join_output.stdout }}"
+
+    - name: 打印worner node 加入命令
+      debug:
+        msg: "{{ worker_node_join_command }}"
+
+- name: 加入工作节点
+  hosts: storage
+  become: true
+  tasks:
+    - name: 获取worker节点的加入命令
+      copy:
+        content: "{{ hostvars['master1']['worker_node_join_command'] }}"
+        dest: /tmp/worker_node_join.sh
+        mode: 0755
+
+    - name: 执行加入节点操作
+      shell: /tmp/worker_node_join.sh
+
+    - name: 清理脚本
+      file:
+        path: /tmp/worker_node_join.sh
+        state: absent

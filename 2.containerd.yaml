@@ -1,5 +1,6 @@
 - name: 安装和配置 Containerd
   hosts: k8s
+  become: true
   tasks:
     - name: 添加 Docker CE 源（用于安装 containerd）
       yum_repository:
@@ -14,6 +15,7 @@
         name:
           - containerd.io
         state: present
+    
     - name: 生成 containerd 配置文件
       shell:
         containerd config default > /etc/containerd/config.toml
@@ -29,6 +31,11 @@
         path=/etc/containerd/config.toml
         regexp="registry.k8s.io/pause:3.6"
         replace="registry.aliyuncs.com/google_containers/pause:3.10"
+
+    - name: 分发containerd.service
+      copy:
+        src: /tmp/containerd.service
+        dest: /usr/lib/systemd/system/containerd.service
     
     - name: 重启 containerd
       systemd:

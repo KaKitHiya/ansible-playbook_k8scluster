@@ -1,0 +1,41 @@
+- name: 节点安装buildkit
+  hosts: k8s
+  become: true
+  tasks:
+    - name: 分发buildkit
+      copy:
+        src: /tmp/buildkit-v0.20.0.linux-amd64.tar.gz
+        dest: /tmp/buildkit-v0.20.0.linux-amd64.tar.gz
+
+    - name: 解压buildkit命令包
+      unarchive:
+        src: /tmp/buildkit-v0.20.0.linux-amd64.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: 移动 buildkit 到系统路径
+      copy:
+        src: /tmp/bin/{{ item }}
+        dest: /usr/local/bin/{{ item }}
+        mode: '0755'
+        remote_src: yes
+      with_items:
+        - ['buildctl','buildkit-cni-bridge','buildkit-cni-firewall','buildkit-cni-host-local','buildkit-cni-loopback','buildkitd','buildkit-qemu-aarch64','buildkit-qemu-arm','buildkit-qemu-i386','buildkit-qemu-ppc64le','buildkit-qemu-riscv64','buildkit-qemu-s390x','buildkit-runc']
+
+    - name: 分发buildkit 服务
+      copy:
+        src: /tmp/buildkit.service
+        dest: /usr/lib/systemd/system/buildkit.service
+        mode: '0644'
+
+    - name: 分发buildkit sockert
+      copy:
+        src: /tmp/buildkit.socket
+        dest: /usr/lib/systemd/system/buildkit.socket
+        mode: '0644'
+
+    - name: 启动buildkit 服务
+      systemd:
+        name: buildkit
+        state: restarted
+        daemon_reload: true

@@ -2,17 +2,43 @@
   hosts: k8s
   become: true
   tasks:
-    - name: 禁用防火墙和SELinux
-      systemd:
-        name: firewalld
-        state: stopped
-        enabled: no
-      when: ansible_os_family == "RedHat"
+    - name: 修改hostname
+      copy:
+        dest: /etc/hostname
+        content: '{{ inventory_hostname }}'
 
-    - name: 关闭swap
-      shell: |
-        swapoff -a
-        sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab     
+    - name: 分发hosts
+      copy:
+        src: /etc/hosts
+        dest: /etc/hosts
+
+    - name: 删除自带yum源
+      file:
+        path: /etc/yum.repos.d/CentOS7-Base-Wangsu.repo
+        state: absent
+
+    - name: 分发aliyun-centos7的yum源
+      copy:
+        src: /etc/yum.repos.d/CentOS-Base.repo
+        dest: /etc/yum.repos.d/CentOS-Base.repo
+        mode: '0644'
+
+    - name: 清理yum过期缓存并建立新缓存
+      shell: yum clean all
+    
+    - name: no   
+      shell: yum makecache
+
+    - name: init
+      yum:
+        name: epel-release
+
+    - name: update all
+      yum:
+        name: "*"
+        state: latest
+      ignore_errors: true
+
     - name: 下载内核rpm安装包
       get_url: 
         url: https://dl.lamp.sh/kernel/el7/kernel-ml-6.7.2-1.el7.elrepo.x86_64.rpm
@@ -39,5 +65,5 @@
       command: grub2-editenv list
       register: envlist
 
-   - name: 重启服务器
-     shell: reboot
+    - name: 重启服务器
+      shell: reboot

@@ -1,0 +1,8 @@
+server {
+  listen 8080;
+  server_name localhost {{ ansible_ssh_host }};
+  location / {
+  default_type application/json;
+  return 200 '{"status":"success","result":" {{ kp_state }}"}';
+  }
+}

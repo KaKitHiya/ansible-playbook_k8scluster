@@ -1,0 +1,12 @@
+- name: asd
+  hosts: lb
+  become: true
+  tasks:
+    - name: 加入高可用vip
+      template:
+        src: /opt/ansible_playbook/k8s.conf.j2
+        dest: /etc/nginx/stream/k8s.conf
+        backup: true
+#      vars:
+#        state: "{{ kp_state }}"
+#        priority: "{{ kp_priority }}"

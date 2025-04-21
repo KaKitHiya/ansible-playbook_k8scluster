@@ -1,0 +1,42 @@
+- name: 获取nerdctl工具
+  hosts: k8s
+  become: yes
+  tasks:
+#    - name: 下载 nerdctl 压缩包
+#      get_url:
+#        url: https://github.com/containerd/nerdctl/releases/download/v2.0.3/nerdctl-2.0.3-linux-amd64.tar.gz
+#        dest: /tmp/nerdctl-2.0.3-linux-amd64.tar.gz
+#        mode: '0644'
+    - name: 分发nerdctl 压缩包
+      copy:
+        src: /tmp/nerdctl-2.0.3-linux-amd64.tar.gz
+        dest: /tmp/nerdctl-2.0.3-linux-amd64.tar.gz
+        mode: '0644'
+
+    - name: 解压 nerdctl 压缩包
+      unarchive:
+        src: /tmp/nerdctl-2.0.3-linux-amd64.tar.gz
+        dest: /tmp/
+        remote_src: yes
+        #extra_opts:
+        #  - --strip-components=1  # 自动去除压缩包中的顶层目录
+
+    - name: 移动 nerdctl 到系统路径
+      copy:
+        src: /tmp/nerdctl
+        dest: /usr/bin/nerdctl
+        mode: '0755'
+        remote_src: yes
+
+- name: helm安装
+  hosts: master
+  become: true
+  tasks:
+    - name: 获取helm安装脚本
+      get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get-helm-3
+        mode: '0755'
+
+    - name: 运行脚本
+      shell: /tmp/get-helm-3

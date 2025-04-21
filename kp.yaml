@@ -1,0 +1,17 @@
+
+- name: test1
+  hosts: lb
+  become: true
+  tasks:
+    - name: test
+      template:
+        src: /tmp/keepalived.conf.j2
+        dest: /tmp/keepalived.conf
+      vars:
+        state: "{{ state }}"
+        priority: "{{ priority }}"
+
+    - name: test
+      template:
+        src: /tmp/k8s.conf.j2
+        dest: /tmp/k8s.conf

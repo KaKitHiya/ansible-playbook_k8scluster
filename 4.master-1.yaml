@@ -40,13 +40,13 @@
       lineinfile:
         dest: /tmp/cluster.yaml
         insertafter: clusterName.*$
-        line: "controlPlaneEndpoint: {{ 私有负载均衡，格式为 'ip:port' }}"
+        line: "controlPlaneEndpoint: {{ 修改为负载均衡api地址 }}"
 
-    - name: 修改容器地址和网络插件兼容
+    - name: 修改容器地址和网络插件兼容(兼容flannel)
       lineinfile:
         dest: /tmp/cluster.yaml
         insertafter: serviceSubnet.*$
-        line: "  podSubnet: {{ 自定义的网络段，用于和后续网络插件匹配（flannel或calico） }}"
+        line: "  podSubnet: 10.244.0.0/16"
     
     - name: 初始化集群
       shell: kubeadm init --config=/tmp/cluster.yaml --upload-certs
@@ -97,7 +97,7 @@
 
 
 - name: 其余master节点加入集群内
-  hosts: master2:master3
+  hosts: master2,master3
   become: true
   tasks:
     - name: 获取master节点的加入命令
@@ -116,7 +116,7 @@
 
 
 - name: 加入工作节点
-  hosts: node
+  hosts: worker,storage
   become: true
   tasks:
     - name: 获取worker节点的加入命令
@@ -128,38 +128,7 @@
     - name: 执行加入节点操作
       shell: /tmp/worker_node_join.sh
 
-    - name: 清除加入节点脚本
+    - name: 清楚加入节点脚本
       file:
         path: /tmp/worker_node_join.sh
         state: absent
-
-- name: 获取admin密钥
-  hosts: master1
-  become: true
-  tasks:
-    - name: 获取远端master1密钥
-      fetch:
-        src: /etc/kubernetes/admin.conf
-        dest: /tmp/admin.conf
-        flat: true
-
-- name: 分发admin密钥
-  hosts: master2,master3
-  become: true
-  tasks:
-    - name: 创建kube文件夹
-      file:
-        path: /root/.kube
-        state: directory
-        mode: '0755'
-
-    - name: 复制集群配置文件到用户kubeconfig
-      copy:
-        src: /tmp/admin.conf
-        dest: /root/.kube/config
-        mode: "0600"
-
-    - name: 指定用户kubeconfig文件
-      shell: export KUBECONFIG=/root/.kube/config
-      args:
-        executable: /bin/bash
