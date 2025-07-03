@@ -1,0 +1,161 @@
+pipeline {
+    agent any
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '7'))
+        timestamps()
+    }
+
+    environment { 
+        target_node = $"your_target_node_ip"
+        codeup_url = $"your_gitlab_url"
+    }
+    
+    stages {
+        stage('Checkout') {
+            agent {
+                docker {
+                    image 'node:14.21.3'  // specify your node image here
+                    args '-u root'
+                    reuseNode true
+                }
+            }
+            when {
+                // multi branch detectd
+                anyOf {
+                    branch 'test'
+                    branch 'master'
+                }
+            }
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/${BRANCH_NAME}']],
+                    userRemoteConfigs: [[
+                        credentialsId: $'project_global_credentials', 
+                        url: "${env.codeup_url}"
+                    ]]
+                ])
+                stash includes: '**', name: 'source-code' // stash resources to be used in next stage
+            }
+        }
+
+        stage('Build') {
+            agent {
+                docker {
+                    image 'node:14.21.3'
+                    args '-u root -v $HOME/.npm:/root/.npm'
+                    reuseNode true
+                }
+            }
+            
+        environment {
+            // according to branch name, set active profile
+            ACTIVE_PROFILE = sh(returnStdout: true, script: '''
+                if [ "$BRANCH_NAME" = "master" ]; then
+                    echo "prod"
+                elif [ "$BRANCH_NAME" = "test" ]; then
+                    echo "test"
+                else
+                    echo ""
+                fi
+            ''').trim()
+            }
+            when {
+                anyOf {
+                    branch 'test'
+                    branch 'master'
+                }
+            }
+            steps {
+                unstash 'source-code'
+                sh """
+                    npm install
+                    npm run build:${env.ACTIVE_PROFILE}
+                    tar -zcvf dist.tar.gz ./dist/*
+                """
+                stash includes: 'dist.tar.gz', name: 'build-artifact'
+            }
+        }
+
+        stage('Deploy to Prod Environment') {
+            agent {
+                docker {
+                    image 'dockette/ssh:latest'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
+            when {
+                branch 'master'
+            }
+            steps {
+                unstash 'build-artifact'
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: $'your_ssh_credentials', 
+                    keyFileVariable: 'key_file', 
+                    passphraseVariable: 'pass',
+                    usernameVariable: 'user'
+                )]) {
+                    sh """
+                        mkdir -p ~/.ssh
+                        chmod 700 ~/.ssh
+                        chmod 600 "$key_file"
+                        ssh-keyscan -H ${env.target_node} >> ~/.ssh/known_hosts
+                        scp -i "$keyfile" \
+                            -o StrictHostKeyChecking=no \
+                            dist.tar.gz ${user}@${env.target_node}:/home/${user}/
+
+                        ssh -i "$keyfile" \
+                            -o StrictHostKeyChecking=no \
+                            ${for_example_script} \
+                            ${user}@${env.target_node} "
+                            sudo mkdir -p /opt/app/prod
+                            sudo tar -xzf /home/${user}/dist.tar.gz -C /opt/app/prod
+                            sudo chown -R www-data:www-data /opt/app/prod
+                            rm /home/${user}/dist.tar.gz
+                        "
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to test Environment') {
+            agent {
+                docker {
+                    image 'dockette/ssh:latest'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
+            when {
+                    branch 'test'
+            }
+            steps {
+                unstash 'build-artifact'
+                withCredentials([sshUserPrivateKey(credentialsId: $'your_ssh_credentials', keyFileVariable: 'key_file', passphraseVariable: 'pass', usernameVariable: 'user')]) {
+                    sh '''
+                    mkdir -p /home/${user}/.ssh 
+                    cat ${key_file} > /home/${user}/.ssh/id_rsa
+                    chmod 600 /home/${user}/.ssh/id_rsa
+                    ssh-keyscan -H ${target_nodes} >> /home/${user}/.ssh/known_hosts
+                    scp -i /home/${user}/.ssh/id_rsa -o StrictHostKeyChecking=no dist.tar.gz ${user}@${target_nodes}:/home/${user}/dist.tar.gz
+                    ssh -i /home/${user}/.ssh/id_rsa -o StrictHostKeyChecking=no ${user}@${target_nodes} "sudo tar -zxvf dist.tar.gz && sudo mkdir test && sudo mv dist/* test/"
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo ${currentBuild.result}
+        }
+        failure {
+            echo ${currentBuild.result}
+        }
+    }
+}
